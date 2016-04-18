@@ -5,10 +5,11 @@
     <title>SQL Helper</title>
 
     <link rel="stylesheet" href="./asset/css/bootstrap.min.css">
+    <link rel="stylesheet" href="./asset/css/app.css">
 </head>
 <body>
 <div class="container" id="container">
-    <div id="sql" class="alert alert-success"></div>
+    <div id="sql" class="alert alert-success" style="height: 50px;"></div>
     <div class="row">
         <div class="col-md-2">
             <label for="type">语句类型</label>
@@ -28,14 +29,18 @@
             <label>字段</label>
             <div class="field-box" v-for="fds in TbFd | kaka">
                 <div class="field-item" v-for="fd in fds.field">
-                    <label>{{ fd }} = </label>
-                    <input v-bind="{ name: fd }" type="text" class="field form-control" placeholder="条件">
+                	<!-- // TODO checkbox -->
+                	<!-- <div class="checkbox">
+                	      <input type="checkbox">
+                	</div> -->
+                    <label><input v-bind="{ name: fd }" type="checkbox" class="condition hidden"> {{ fd }} = </label>
+                    <input id="i-{{ fd }}" v-bind="{ name: fd }" type="text" class="field form-control" placeholder="条件" condition=false>
                 </div>
             </div>
         </div>
 
         <div class="col-md-2">
-            <button id="btn" class="btn btn-success">生成</button>
+            <button id="btn" class="btn btn-success btn-block">生成</button>
         </div>
     </div>
 
@@ -60,10 +65,12 @@
                     {name: "Update", value: "UPDATE"},
                     {name: "Query", value: "QUERY"}
                 ],
-                checkedType: "INSERT",
+                checkedType: "UPDATE",
                 checkedTable: "tb_role",
                 // 结构：[{name: "fieldName", value: "fieldValue"}, ...]
-                checkedField: []
+                checkedField: [],
+                // 结构 checkedField ，用于保存选择的条件和条件值
+                checkedCondition: []
             },
 
             methods: {
@@ -89,15 +96,16 @@
         });
 
         $.get("resolveDatabase.php", new Date().getTime(), function (result) {
-            console.log(result);
+//            console.log(result);
             vmData.TbFd = result.retData;
         });
 
         var sql = "";
         function updateSQL() {
+            /******* 插入 *******/
             if (vmData.checkedType === vmData.types[0].value) {
-                var filedNameStr = "";
-                var filedValueStr = "";
+                let filedNameStr = "",
+                    filedValueStr = "";
                 vmData.checkedField.forEach(function (e, i, a) {
                     filedNameStr += e.name + ", ";
                     filedValueStr += e.value + ", ";
@@ -106,6 +114,8 @@
                 filedNameStr = filedNameStr.slice(0, -2);
                 filedValueStr = filedValueStr.slice(0, -2);
                 sql = `INSERT INTO ${vmData.checkedTable} (` + filedNameStr + `) VALUES (` + filedValueStr + `)`;
+                
+            /******* 删除 *******/
             } else if (vmData.checkedType === vmData.types[1].value) {
                 let str = "";
                 vmData.checkedField.forEach(function (e, i, a) {
@@ -113,13 +123,27 @@
                 });
                 str = str.slice(0, -5);
                 sql = `DELETE FROM ${vmData.checkedTable} WHERE ` + str; //TODO delete condition
+                
+            /******* 修改 *******/
             } else if (vmData.checkedType === vmData.types[2].value) {
+                
+                // 组成 SET 后面的语句
                 let str = "";
                 vmData.checkedField.forEach(function (e, i, a) {
-                    str += e.name + " = " + e.value + ", ";
+                    str += `${e.name} = '${e.value}'` + ", ";
                 });
                 str = str.slice(0, -2);
-                sql = `UPDATE ${vmData.checkedTable} SET ` + str + " WHERE "; //TODO update condition
+                
+                // 组成 WHERE 后面的语句
+                let cond = "";
+                vmData.checkedCondition.forEach(function (e, i, a) {
+                    cond += `${e.name} = '${e.value}'` + " AND ";
+                });
+                cond = cond.slice(0, -5);
+                
+                sql = `UPDATE ${vmData.checkedTable} SET ` + str + " WHERE " + cond; //TODO update condition
+                
+            /******* 查询 *******/
             } else if (vmData.checkedType === vmData.types[3].value) {
                 let str = "",
                     col = "*";
@@ -135,23 +159,51 @@
 
         // 标记有 class = change 的改变来动态修改SQL 语句
         // 主要就是几个 select 元素而已
-        $(".change").change(function () {
+        $("select.change").change(function () {
+            // 切换语句类型前先将所有 checkbox 清空选择
+            unCheckAll();
+            if ($(this).val() === vmData.types[2].value) {
+                $("input[type=checkbox]").removeClass("hidden");
+            } else {
+                $("input[type=checkbox]").addClass("hidden");
+            }
             updateSQL();
         });
 
         // 通过最后手动点击来搜集填写的值
         $("#btn").click(function () {
+            // 将 condition 标记清空
+            $("input[type=text].field").each(function () {
+                $(this).attr("condition", "false");
+            });
+            
+            // 通过 checkbox 来检测和设置哪些字段是条件(通过设置 "condition" 属性为 "true")
+            // 每次都读取页面上填写完毕的值，并在此之前清空原先的数组内容
+            vmData.checkedCondition.length = 0;
+            $("input[type=checkbox].condition:checked").each(function () {
+                var fieldName = $(this).attr("name");
+                var fieldID = `i-${fieldName}`;
+                
+                $(`#${fieldID}`).attr("condition", "true");
+            });
+            
             // 每次都读取页面上填写完毕的值，并在此之前清空原先的数组内容
             vmData.checkedField.length = 0;
-            $(".field").each(function () {
+            $("input[type=text].field").each(function () {
                 var fieldName = $(this).attr("name");
                 var fieldValue = $(this).val();
+                var fieldID = `i-${fieldName}`;
                 if (!isEmptyString(fieldValue)) {
-//                    console.log(fieldName + ": " + fieldValue);
-                    vmData.checkedField.push({name: fieldName, value: fieldValue});
+                    // 如果设置了 "condition" 属性为 "true" 的话表示这个字段是条件(WHERE 后面的)
+                    if ($(`#${fieldID}`).attr("condition") === "true") {
+                        vmData.checkedCondition.push({name: fieldName, value: fieldValue});
+                    } else {
+                        vmData.checkedField.push({name: fieldName, value: fieldValue});
+                    }
                 }
             });
-
+            
+            // 更新语句
             updateSQL();
         });
 
