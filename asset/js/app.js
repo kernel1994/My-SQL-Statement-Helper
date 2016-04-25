@@ -21,7 +21,7 @@ $(function () {
             // 结构：[{name: "fieldName", value: "fieldValue"}, ...]
             checkedField: [],
             // 勾选和填写的条件
-            // 结构 checkedField ，用于保存选择的条件和条件值
+            // 结构同 checkedField ，用于保存选择的条件和条件值
             checkedCondition: []
         },
 

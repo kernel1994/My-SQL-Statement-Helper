@@ -29,10 +29,6 @@
             <label>字段</label>
             <div class="field-box" v-for="fds in TbFd | kaka">
                 <div class="field-item" v-for="fd in fds.field">
-                	<!-- // TODO checkbox -->
-                	<!-- <div class="checkbox">
-                	      <input type="checkbox">
-                	</div> -->
                     <label><input v-bind="{ name: fd }" type="checkbox" class="condition hidden"> {{ fd }} = </label>
                     <input id="i-{{ fd }}" v-bind="{ name: fd }" type="text" class="field form-control" placeholder="条件" condition=false>
                 </div>
